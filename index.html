@@ -204,7 +204,7 @@
 
             const board = document.getElementById('gameBoard');
             // 🌟 レスポンシブ対応：画面幅を列数で等分するグリッド（1fr = 均等幅）
-            board.style.gridTemplateColumns = `repeat(${columns}, 1fr)`;
+            board.style.gridTemplateColumns = `repeat(${columns}, minmax(50px, 85px))`;
             
             cards.forEach(imgSrc => {
                 const card = document.createElement('div');
