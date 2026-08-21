@@ -194,8 +194,10 @@
         function initGame() {
             let allImages = [];
             for (let i = 1; i <= 40; i++) {
-                allImages.push(`${i}.png`);
-            }
+    // String(i).padStart(2, '0') で、1を「01」に変換します
+    let fileName = String(i).padStart(2, '0') + '.png';
+    allImages.push(fileName);
+}
             allImages.sort(() => 0.5 - Math.random());
             const selectedImages = allImages.slice(0, totalPairs);
             
@@ -265,41 +267,38 @@
             sendDataToGAS(playerName, seconds, currentLevel);
         }
 
-        function sendDataToGAS(name, time, level) {
-            if(GAS_URL === 'https://script.google.com/macros/s/AKfycbzrBNOTuG1XFN2VEbA31bgDNiWttLLjyuOoX35nh6GCXv1S_zQnYA78AQFCxL2RVi4qAA/exec') {
-                document.getElementById('sendingMsg').textContent = "※GASのURLが設定されていません"; return;
-            }
-
-            const url = `${GAS_URL}?name=${encodeURIComponent(name)}&time=${time}&level=${level}`;
+function sendDataToGAS(name, time, level) {
+    // 安全装置のif文は削除しました！
+    const url = `${GAS_URL}?name=${encodeURIComponent(name)}&time=${time}&level=${level}`;
+    
+    fetch(url)
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('sendingMsg').style.display = 'none';
+            const rankingWrap = document.getElementById('ranking-table-wrap');
+            const rankingTbody = document.getElementById('ranking-tbody');
             
-            fetch(url)
-                .then(response => response.json())
-                .then(data => {
-                    document.getElementById('sendingMsg').style.display = 'none';
-                    const rankingWrap = document.getElementById('ranking-table-wrap');
-                    const rankingTbody = document.getElementById('ranking-tbody');
-                    
-                    const levelNames = { 'easy': 'かんたん', 'normal': 'ふつう', 'hard': 'むずかしい', 'max': '全乗せMAX' };
-                    document.getElementById('rankingTitle').textContent = `🏆 ランキング (${levelNames[level]})`;
-                    
-                    rankingWrap.style.display = 'block';
-                    rankingTbody.innerHTML = ''; 
-                    
-                    if(data.ranking && data.ranking.length > 0) {
-                        data.ranking.forEach((record, index) => {
-                            const tr = document.createElement('tr');
-                            tr.innerHTML = `<td>${index + 1}</td><td>${record.name}</td><td style="text-align:right;">${record.time}秒</td>`;
-                            rankingTbody.appendChild(tr);
-                        });
-                    } else {
-                        rankingTbody.innerHTML = '<tr><td colspan="3" style="text-align:center;">まだ記録がありません！</td></tr>';
-                    }
-                })
-                .catch(error => {
-                    document.getElementById('sendingMsg').textContent = "通信エラーが発生しました";
-                    console.error("Error:", error);
+            const levelNames = { 'easy': 'かんたん', 'normal': 'ふつう', 'hard': 'むずかしい', 'max': '全乗せMAX' };
+            document.getElementById('rankingTitle').textContent = `🏆 ランキング (${levelNames[level]})`;
+            
+            rankingWrap.style.display = 'block';
+            rankingTbody.innerHTML = ''; 
+            
+            if(data.ranking && data.ranking.length > 0) {
+                data.ranking.forEach((record, index) => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `<td>${index + 1}</td><td>${record.name}</td><td style="text-align:right;">${record.time}秒</td>`;
+                    rankingTbody.appendChild(tr);
                 });
-        }
+            } else {
+                rankingTbody.innerHTML = '<tr><td colspan="3" style="text-align:center;">まだ記録がありません！</td></tr>';
+            }
+        })
+        .catch(error => {
+            document.getElementById('sendingMsg').textContent = "通信エラーが発生しました";
+            console.error("Error:", error);
+        });
+}
     </script>
 </body>
 </html>
