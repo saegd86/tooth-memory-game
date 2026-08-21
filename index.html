@@ -2,71 +2,143 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>がいどん神経衰弱</title>
     <style>
-        body { font-family: 'Helvetica Neue', Arial, sans-serif; background-color: #f4f7f6; text-align: center; margin: 0; padding: 20px; }
-        .screen { display: none; }
-        .active { display: block; }
-        .stats { margin-bottom: 20px; font-size: 1.2rem; font-weight: bold; color: #555; }
-        
-        /* 列数はJavaScriptで動的に変更します */
-        .game-board {
-            display: grid; gap: 10px; justify-content: center; margin: 0 auto;
+        body {
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            background-color: #f4f7f6;
+            background: radial-gradient(circle, #fdfbfb, #ebedee); /* 優しい背景色 */
+            color: #333;
+            text-align: center;
+            margin: 0;
+            padding: 10px;
+            /* スマホで横揺れしないようにする */
+            overflow-x: hidden;
         }
-        .card { width: 80px; height: 100px; perspective: 1000px; cursor: pointer; }
-        .card-inner { width: 100%; height: 100%; position: relative; transition: transform 0.5s; transform-style: preserve-3d; }
+
+        h1 { margin: 10px 0; font-size: 1.5rem; color: #550028; }
+
+        /* -----------------------------------
+           UIオーバーレイ（スタート画面・結果画面）
+           ※シューティングゲームのデザインを踏襲
+        ------------------------------------ */
+        #start-overlay, #result-overlay {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.4);
+            display: flex; align-items: center; justify-content: center; z-index: 9999; padding: 15px; box-sizing: border-box;
+        }
+        #start-box, #result-box {
+            background: rgba(255,255,255,0.95); color: #1b1b1b; border-radius: 16px;
+            padding: 20px; width: min(560px, 94vw); text-align: center; box-shadow: 0 12px 32px rgba(0,0,0,0.25);
+        }
+        #start-box p { font-weight: bold; margin-bottom: 15px; }
+        
+        #name-input {
+            width: 100%; max-width: 320px; padding: 12px; border-radius: 12px;
+            border: 2px solid rgba(255,105,180,0.6); outline: none; font-size: 16px; font-weight: bold; margin-bottom: 15px; box-sizing: border-box;
+        }
+
+        /* ボタンデザイン */
+        .start-buttons { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; max-width: 340px; margin: 0 auto; }
+        .btn {
+            border: none; border-radius: 12px; cursor: pointer; font-weight: bold; font-size: 14px; width: 48%; padding: 12px 0;
+        }
+        #btn-easy { background: #00ffff; color: #003; box-shadow: 0 6px 14px rgba(0,255,255,0.25); }
+        #btn-normal { background: #ffd700; color: #330; box-shadow: 0 6px 14px rgba(255,215,0,0.4); }
+        #btn-hard { background: #ffb6c1; color: #550028; box-shadow: 0 6px 14px rgba(255,182,193,0.4); }
+        #btn-max { background: #dda0dd; color: #330033; box-shadow: 0 6px 14px rgba(221,160,221,0.4); }
+        
+        #retry-btn { width: 100%; max-width: 200px; background: #00ffff; color: #003; box-shadow: 0 8px 18px rgba(0,255,255,0.25); margin: 10px auto; display: block; }
+        
+        /* -----------------------------------
+           ゲーム画面・カードのレスポンシブ対応
+        ------------------------------------ */
+        #gameScreen { display: none; padding-bottom: 20px; }
+        .stats { margin-bottom: 15px; font-size: 1.1rem; font-weight: bold; color: #555; }
+        
+        /* グリッドをスマホ対応に（画面幅に合わせてカードが縮む） */
+        .game-board {
+            display: grid;
+            gap: 8px; /* カードの隙間 */
+            justify-content: center;
+            margin: 0 auto;
+            width: 100%;
+            max-width: 500px; /* PCでの最大幅 */
+        }
+        
+        /* カード全体の比率を維持 */
+        .card {
+            width: 100%;
+            aspect-ratio: 4 / 5; /* 縦長（80x100の比率）をキープ */
+            perspective: 1000px;
+            cursor: pointer;
+        }
+        
+        .card-inner { width: 100%; height: 100%; position: relative; transition: transform 0.4s; transform-style: preserve-3d; }
         .card.flipped .card-inner { transform: rotateY(180deg); }
         .card-front, .card-back {
             width: 100%; height: 100%; position: absolute; backface-visibility: hidden;
-            border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); display: flex; align-items: center; justify-content: center;
-            background-color: white; border: 2px solid #ddd;
+            border-radius: 8px; box-shadow: 0 3px 6px rgba(0,0,0,0.1); display: flex; align-items: center; justify-content: center;
+            background-color: white; border: 2px solid #ddd; box-sizing: border-box;
         }
         .card-back { background-color: #e0f2fe; }
-        .card-back img { width: 80%; }
+        .card-back img { width: 75%; height: auto; object-fit: contain; }
         .card-front { transform: rotateY(180deg); }
-        .card-front img { width: 90%; }
-        
-        input, select { padding: 10px; font-size: 1rem; border-radius: 5px; border: 1px solid #ccc; margin-bottom: 10px; }
-        button { padding: 10px 20px; font-size: 1rem; cursor: pointer; border-radius: 5px; border: none; background-color: #3498db; color: white; margin-top: 10px; }
+        .card-front img { width: 85%; height: auto; object-fit: contain; }
+
+        /* -----------------------------------
+           ランキングテーブル
+        ------------------------------------ */
+        #ranking-table-wrap { margin-top: 10px; text-align: left; max-height: 35vh; overflow: auto; }
+        #ranking-table { width: 100%; border-collapse: collapse; font-size: 14px; color: #222; }
+        #ranking-table th, #ranking-table td { padding: 8px 0; border-bottom: 1px solid rgba(0,0,0,0.1); }
+        #ranking-table th:last-child, #ranking-table td:last-child { text-align: right; padding-right: 6px; }
+        #sendingMsg { font-weight: bold; color: #d00000; }
     </style>
 </head>
 <body>
 
-    <h1>🦷 キャラクター神経衰弱 🦷</h1>
-
-    <!-- 1. スタート画面 -->
-    <div id="startScreen" class="screen active">
-        <p>名前と難易度を選んでスタート！</p>
-        <input type="text" id="playerName" placeholder="あなたの名前" required><br>
-        <select id="difficulty">
-            <option value="easy">かんたん (6ペア・12枚)</option>
-            <option value="normal" selected>ふつう (8ペア・16枚)</option>
-            <option value="hard">むずかしい (15ペア・30枚)</option>
-            <option value="max">全乗せMAX (20ペア・40枚)</option>
-        </select><br>
-        <button onclick="startGame()">スタート</button>
+    <!-- 1. スタート画面（UI変更） -->
+    <div id="start-overlay">
+        <div id="start-box">
+            <h2>がいどん神経衰弱</h2>
+            <p>名前を入力して、難易度を選択！</p>
+            <input type="text" id="name-input" maxlength="20" placeholder="例：がいどん" required>
+            <div class="start-buttons">
+                <button id="btn-easy" class="btn" type="button" onclick="startGame('easy')">かんたん(12枚)</button>
+                <button id="btn-normal" class="btn" type="button" onclick="startGame('normal')">ふつう(16枚)</button>
+                <button id="btn-hard" class="btn" type="button" onclick="startGame('hard')">むずかしい(30枚)</button>
+                <button id="btn-max" class="btn" type="button" onclick="startGame('max')">全乗せMAX(40枚)</button>
+            </div>
+        </div>
     </div>
 
     <!-- 2. ゲーム画面 -->
-    <div id="gameScreen" class="screen">
+    <div id="gameScreen">
+        <h1>がいどん神経衰弱</h1>
         <div class="stats">
-            プレイヤー: <span id="displayPlayer"></span> | タイム: <span id="time">0</span>秒
+            <span id="displayPlayer"></span> | タイム: <span id="time">0</span>秒
         </div>
         <div class="game-board" id="gameBoard"></div>
     </div>
 
     <!-- 3. 結果＆ランキング画面 -->
-    <div id="endScreen" class="screen">
-        <h2>🎉 クリア！ 🎉</h2>
-        <p>タイム: <span id="finalTime"></span>秒</p>
-        <p id="sendingMsg">ランキングデータを送信中...</p>
-        
-        <div id="rankingArea" style="margin-top: 20px; display: none;">
-            <h3 id="rankingTitle">🏆 ランキング 🏆</h3>
-            <ul id="rankingList" style="list-style: none; padding: 0;"></ul>
+    <div id="result-overlay" style="display:none;">
+        <div id="result-box">
+            <h2 id="rankingTitle">🎉 クリア！ 🎉</h2>
+            <p style="color:#d00000; font-size:18px;">タイム: <span id="finalTime"></span>秒</p>
+            <p id="sendingMsg">ランキング取得中...</p>
+            
+            <div id="ranking-table-wrap" style="display: none;">
+                <table id="ranking-table">
+                    <thead>
+                        <tr><th style="width:40px;">順位</th><th>名前</th><th style="width:80px; text-align:right;">タイム</th></tr>
+                    </thead>
+                    <tbody id="ranking-tbody"></tbody>
+                </table>
+            </div>
+            <button id="retry-btn" class="btn" type="button" onclick="location.reload()">もう一度遊ぶ</button>
         </div>
-        <button onclick="location.reload()">もう一度遊ぶ</button>
     </div>
 
     <script>
@@ -74,10 +146,18 @@
         const GAS_URL = 'https://script.google.com/macros/s/AKfycbzrBNOTuG1XFN2VEbA31bgDNiWttLLjyuOoX35nh6GCXv1S_zQnYA78AQFCxL2RVi4qAA/exec';
         const logoImage = 'logo.png'; 
 
+        // ページ読み込み時に、前回入力した名前を復元
+        document.addEventListener("DOMContentLoaded", () => {
+            const storedName = localStorage.getItem('teeth_memory_name') || '';
+            if (storedName) {
+                document.getElementById('name-input').value = storedName;
+            }
+        });
+
         let playerName = '';
         let currentLevel = '';
         let totalPairs = 8;
-        let columns = 4; // グリッドの列数
+        let columns = 4;
         
         let cards = [];
         let hasFlippedCard = false;
@@ -87,41 +167,44 @@
         let timer;
         let seconds = 0;
 
-        function startGame() {
-            const nameInput = document.getElementById('playerName').value;
+        // ゲームスタート関数（ボタンから呼ばれる）
+        function startGame(level) {
+            const nameInput = document.getElementById('name-input').value;
             if (!nameInput) { alert('名前を入力してください！'); return; }
             
             playerName = nameInput;
-            currentLevel = document.getElementById('difficulty').value;
+            currentLevel = level;
             
-            // 難易度設定
-            if (currentLevel === 'easy') { totalPairs = 6; columns = 4; }
-            else if (currentLevel === 'normal') { totalPairs = 8; columns = 4; }
-            else if (currentLevel === 'hard') { totalPairs = 15; columns = 5; }
-            else if (currentLevel === 'max') { totalPairs = 20; columns = 5; } // 40枚の最高難易度！
+            // 入力された名前をブラウザに記憶
+            localStorage.setItem('teeth_memory_name', playerName);
+            
+            // 難易度設定 (columns はスマホ対応グリッドの列数)
+            if (level === 'easy') { totalPairs = 6; columns = 3; }
+            else if (level === 'normal') { totalPairs = 8; columns = 4; }
+            else if (level === 'hard') { totalPairs = 15; columns = 5; }
+            else if (level === 'max') { totalPairs = 20; columns = 5; }
 
             document.getElementById('displayPlayer').textContent = playerName;
-            document.getElementById('startScreen').classList.remove('active');
-            document.getElementById('gameScreen').classList.add('active');
+            document.getElementById('start-overlay').style.display = 'none';
+            document.getElementById('gameScreen').style.display = 'block';
             
             initGame();
         }
 
-       function initGame() {
-    // 🌟 ここで「1.png」〜「40.png」のファイル名配列を自動生成しています
-    let allImages = [];
-    for (let i = 1; i <= 40; i++) {
-        allImages.push(`${i}.png`);
-    }
-    allImages.sort(() => 0.5 - Math.random());
-    const selectedImages = allImages.slice(0, totalPairs);
+        function initGame() {
+            let allImages = [];
+            for (let i = 1; i <= 40; i++) {
+                allImages.push(`${i}.png`);
+            }
+            allImages.sort(() => 0.5 - Math.random());
+            const selectedImages = allImages.slice(0, totalPairs);
             
             cards = [...selectedImages, ...selectedImages];
             cards.sort(() => 0.5 - Math.random());
 
             const board = document.getElementById('gameBoard');
-            // 列数を動的に設定
-            board.style.gridTemplateColumns = `repeat(${columns}, 80px)`;
+            // 🌟 レスポンシブ対応：画面幅を列数で等分するグリッド（1fr = 均等幅）
+            board.style.gridTemplateColumns = `repeat(${columns}, 1fr)`;
             
             cards.forEach(imgSrc => {
                 const card = document.createElement('div');
@@ -165,7 +248,7 @@
                     firstCard.classList.remove('flipped');
                     secondCard.classList.remove('flipped');
                     resetBoard();
-                }, 1000);
+                }, 800); // 間違えた時に裏返る速度を少し速く調整（スマホでサクサク遊べるように）
             }
         }
 
@@ -176,43 +259,40 @@
 
         function gameClear() {
             clearInterval(timer);
-            document.getElementById('gameScreen').classList.remove('active');
-            document.getElementById('endScreen').classList.add('active');
             document.getElementById('finalTime').textContent = seconds;
+            document.getElementById('result-overlay').style.display = 'flex';
+            
             sendDataToGAS(playerName, seconds, currentLevel);
         }
 
         function sendDataToGAS(name, time, level) {
-            if(GAS_URL === 'ここにGASのURLを貼り付けてください') {
+            if(GAS_URL === 'https://script.google.com/macros/s/AKfycbzrBNOTuG1XFN2VEbA31bgDNiWttLLjyuOoX35nh6GCXv1S_zQnYA78AQFCxL2RVi4qAA/exec') {
                 document.getElementById('sendingMsg').textContent = "※GASのURLが設定されていません"; return;
             }
 
-            // 🌟 送信URLに「level」を追加
             const url = `${GAS_URL}?name=${encodeURIComponent(name)}&time=${time}&level=${level}`;
             
             fetch(url)
                 .then(response => response.json())
                 .then(data => {
                     document.getElementById('sendingMsg').style.display = 'none';
-                    const rankingArea = document.getElementById('rankingArea');
-                    const rankingList = document.getElementById('rankingList');
+                    const rankingWrap = document.getElementById('ranking-table-wrap');
+                    const rankingTbody = document.getElementById('ranking-tbody');
                     
-                    // 難易度名をランキングタイトルに反映
                     const levelNames = { 'easy': 'かんたん', 'normal': 'ふつう', 'hard': 'むずかしい', 'max': '全乗せMAX' };
-                    document.getElementById('rankingTitle').textContent = `🏆 ランキング (${levelNames[level]}) 🏆`;
+                    document.getElementById('rankingTitle').textContent = `🏆 ランキング (${levelNames[level]})`;
                     
-                    rankingArea.style.display = 'block';
-                    rankingList.innerHTML = ''; // リストを初期化
+                    rankingWrap.style.display = 'block';
+                    rankingTbody.innerHTML = ''; 
                     
                     if(data.ranking && data.ranking.length > 0) {
                         data.ranking.forEach((record, index) => {
-                            const li = document.createElement('li');
-                            li.textContent = `${index + 1}位: ${record.name} - ${record.time}秒`;
-                            li.style.marginBottom = '5px';
-                            rankingList.appendChild(li);
+                            const tr = document.createElement('tr');
+                            tr.innerHTML = `<td>${index + 1}</td><td>${record.name}</td><td style="text-align:right;">${record.time}秒</td>`;
+                            rankingTbody.appendChild(tr);
                         });
                     } else {
-                        rankingList.innerHTML = '<li>まだ記録がありません。あなたが1位です！</li>';
+                        rankingTbody.innerHTML = '<tr><td colspan="3" style="text-align:center;">まだ記録がありません！</td></tr>';
                     }
                 })
                 .catch(error => {
